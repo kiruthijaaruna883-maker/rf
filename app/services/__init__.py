@@ -12,6 +12,11 @@ from app.services.embeddings import (
     embed_text,
     embed_texts,
 )
+from app.services.retrieval import (
+    ChunkSearchResult,
+    retrieve_chunks,
+    search_similar_chunks,
+)
 from app.services.text_extraction import (
     extract_document_text,
     extract_text_from_docx,
@@ -23,6 +28,7 @@ from app.services.vector_storage import store_document_chunks
 
 __all__ = [
     "Chunk",
+    "ChunkSearchResult",
     "EmbeddingAPIError",
     "EmbeddingConfigError",
     "EmbeddingError",
@@ -35,5 +41,7 @@ __all__ = [
     "extract_text_from_pdf",
     "extract_text_from_txt",
     "normalize_text",
+    "retrieve_chunks",
+    "search_similar_chunks",
     "store_document_chunks",
 ]
