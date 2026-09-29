@@ -2,6 +2,7 @@
 
 from fastapi import FastAPI
 from app.api.auth import router as auth_router
+from app.api.documents import router as documents_router
 
 
 def create_app() -> FastAPI:
@@ -12,8 +13,9 @@ def create_app() -> FastAPI:
         version="0.1.0",
     )
 
-    # Include authentication router
+    # Include routers
     app.include_router(auth_router)
+    app.include_router(documents_router)
 
     # In FastAPI >= 0.141, include_router wraps routes in _IncludedRouter.
     # Expose the underlying APIRoutes directly in app.router.routes for
