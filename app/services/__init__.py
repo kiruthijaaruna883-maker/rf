@@ -19,6 +19,7 @@ from app.services.text_extraction import (
     extract_text_from_txt,
     normalize_text,
 )
+from app.services.vector_storage import store_document_chunks
 
 __all__ = [
     "Chunk",
@@ -34,4 +35,5 @@ __all__ = [
     "extract_text_from_pdf",
     "extract_text_from_txt",
     "normalize_text",
+    "store_document_chunks",
 ]

@@ -1,12 +1,15 @@
 """SQLAlchemy 2.x database models for Regulatory Affairs Assistant."""
 
 from datetime import datetime
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
+from pgvector.sqlalchemy import Vector
 from sqlalchemy import (
     Boolean,
     DateTime,
     ForeignKey,
+    Index,
     Integer,
+    JSON,
     String,
     Text,
     func,
@@ -73,10 +76,57 @@ class Document(Base):
         nullable=False,
     )
 
-    # Relationship back to User
+    # Relationships
     user: Mapped[Optional["User"]] = relationship(
         "User",
         back_populates="documents",
+    )
+    chunks: Mapped[List["DocumentChunk"]] = relationship(
+        "DocumentChunk",
+        back_populates="document",
+        cascade="all, delete-orphan",
+    )
+
+
+class DocumentChunk(Base):
+    """Document text chunk and dense vector embedding model."""
+
+    __tablename__ = "document_chunks"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    document_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("documents.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    chunk_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    char_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    start_char: Mapped[int] = mapped_column(Integer, nullable=False)
+    end_char: Mapped[int] = mapped_column(Integer, nullable=False)
+    metadata_json: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSON, nullable=True)
+    embedding: Mapped[List[float]] = mapped_column(Vector(1536), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+    # Relationship back to Document
+    document: Mapped["Document"] = relationship(
+        "Document",
+        back_populates="chunks",
+    )
+
+    __table_args__ = (
+        Index("uq_document_chunks_doc_chunk", "document_id", "chunk_index", unique=True),
+        Index(
+            "idx_document_chunks_embedding_hnsw",
+            "embedding",
+            postgresql_using="hnsw",
+            postgresql_ops={"embedding": "vector_cosine_ops"},
+        ),
     )
 
 
