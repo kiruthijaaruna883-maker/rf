@@ -1,3 +1,5 @@
+
+
 # Regulatory Affairs Assistant — System Architecture
 
 ## 1. Project Title
@@ -105,7 +107,7 @@ graph TD
    * User metadata inquiries trigger `user_lookup(user_id)`.
    * Straightforward conversational replies are handled directly.
 6. **Response Synthesis:** LangGraph synthesizes the retrieved evidence into a coherent response with clear source references.
-7. **Audit & Logging:** FastAPI writes the interaction, token usage, tool calls, and final response to PostgreSQL audit logs.
+7. **Audit & Logging:** FastAPI writes the completed user query, assistant response, and session metadata to the PostgreSQL `chat_logs` table.
 8. **Presentation:** The response is returned to Streamlit and displayed to the user.
 
 ---
@@ -164,7 +166,10 @@ graph TD
    * An information-retrieval tool that queries structured drug registries and database tables to retrieve structured drug/product information from an external or structured source (e.g., active ingredients, indications, approval status).
    * **Scope & Medical Disclaimer:** It is strictly an information-retrieval tool. It must NOT provide medical advice, prescribe treatment, or independently recommend dosage or treatment decisions.
 3. **`web_search(query: str) -> str`**
-   * Performs real-time external searches against official regulatory agency portals (e.g., FDA, EMA, ICH) for updated announcements or public guidelines.
+   * Exists in the Phase 5 agent tool layer to handle external regulatory intelligence queries.
+   * Currently performs deterministic input validation and returns an explicit deferred/unconfigured response.
+   * Does NOT perform live external network searches.
+   * Real-time searches against official regulatory agency portals (e.g., FDA, EMA, ICH) for updated announcements or public guidelines are deferred to a future release.
 4. **`user_lookup(user_id: str) -> dict`**
    * Retrieves user access permissions, department metadata, and audit information from the PostgreSQL user registry.
 
@@ -173,7 +178,7 @@ graph TD
 ## 11. PostgreSQL Responsibilities
 * **Relational Data Management:** Stores user accounts, hashed credentials, roles, and administrative configuration.
 * **Document Metadata:** Stores ingested document records, file paths, upload timestamps, and processing statuses.
-* **Audit & Chat Logs:** Records immutable logs of every request, query classification, tool invocation, and generated output for compliance auditability.
+* **Audit & Chat Logs:** Records immutable logs of completed user queries, assistant responses, and session metadata in the `chat_logs` table for compliance auditability.
 
 ---
 
@@ -219,9 +224,16 @@ graph TD
 
 ## 17. Logging Flow
 1. **Request Interception:** FastAPI captures incoming user queries along with user identity and session ID.
-2. **Execution Tracking:** Tool calls, execution durations, and model metadata from LangGraph are accumulated.
-3. **Database Logging:** The entire transaction is recorded in PostgreSQL `audit_logs` (storing timestamp, user_id, prompt, tool_calls, response, and token count).
-4. **Compliance Trail:** Provides a tamper-resistant audit trail necessary for regulatory and quality assurance inspection.
+2. **Agent Execution:** The LangGraph agent executes tools, manages Redis memory, and synthesizes the response.
+3. **Database Logging:** The completed interaction is persisted directly to the PostgreSQL `chat_logs` table for the authenticated user and session.
+   * Current fields stored:
+     * `user_id`
+     * `session_id`
+     * `user_query`
+     * `assistant_response`
+     * `created_at`
+   * The Phase 5 chat API persists the completed user query and assistant response for the authenticated user/session upon every successful request.
+4. **Compliance Trail:** Provides a tamper-resistant audit trail in `chat_logs` necessary for regulatory and quality assurance inspection.
 
 ---
 

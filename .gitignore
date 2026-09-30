@@ -51,3 +51,6 @@ htmlcov/
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# Runtime & Generated Files
+*.rdb
