@@ -1,0 +1,390 @@
+{
+  "info": {
+    "_postman_id": "e174b79e-627e-4ccf-85dd-82d0a5551db4",
+    "name": "Regulatory Affairs Assistant API",
+    "description": "Comprehensive Postman collection for the Regulatory Affairs Assistant (RAG Chatbot). Covers health checks, OAuth2/JWT authentication, document ingestion, agent chat interactions (RAG retrieval, openFDA drug lookup, Redis conversation memory), and session clearing.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://127.0.0.1:8000",
+      "type": "string"
+    },
+    {
+      "key": "access_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "session_id",
+      "value": "demo-session-001",
+      "type": "string"
+    },
+    {
+      "key": "username",
+      "value": "regulatory_specialist",
+      "type": "string"
+    },
+    {
+      "key": "email",
+      "value": "specialist@example.com",
+      "type": "string"
+    },
+    {
+      "key": "password",
+      "value": "SecurePass123!",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Operational Health Check",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/health",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "health"
+          ]
+        },
+        "description": "Operational health check probe. Unauthenticated. Verifies PostgreSQL and Redis connectivity without leaking credentials."
+      }
+    },
+    {
+      "name": "2. Register User",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"username\": \"{{username}}\",\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/auth/register",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "auth",
+            "register"
+          ]
+        },
+        "description": "Registers a new user account with username, email, and password."
+      }
+    },
+    {
+      "name": "3. Login & Obtain JWT Token",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "if (pm.response.code === 200) {",
+              "    var jsonData = pm.response.json();",
+              "    if (jsonData.access_token) {",
+              "        pm.collectionVariables.set(\"access_token\", jsonData.access_token);",
+              "        console.log(\"Saved access_token to collection variable.\");",
+              "    }",
+              "}"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/x-www-form-urlencoded"
+          }
+        ],
+        "body": {
+          "mode": "urlencoded",
+          "urlencoded": [
+            {
+              "key": "username",
+              "value": "{{username}}",
+              "type": "text"
+            },
+            {
+              "key": "password",
+              "value": "{{password}}",
+              "type": "text"
+            }
+          ]
+        },
+        "url": {
+          "raw": "{{base_url}}/auth/login",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "auth",
+            "login"
+          ]
+        },
+        "description": "Authenticates credentials via OAuth2 password flow and captures the JWT access token into the access_token variable."
+      }
+    },
+    {
+      "name": "4. Get Current User Profile",
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{access_token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/auth/me",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "auth",
+            "me"
+          ]
+        },
+        "description": "Fetches authenticated user profile using the Bearer JWT token."
+      }
+    },
+    {
+      "name": "5. Upload Regulatory Document",
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{access_token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            {
+              "key": "file",
+              "type": "file",
+              "src": "",
+              "description": "Select a local regulatory document file (.pdf, .docx, or .txt) from your filesystem before sending."
+            }
+          ]
+        },
+        "url": {
+          "raw": "{{base_url}}/documents/upload",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "documents",
+            "upload"
+          ]
+        },
+        "description": "Uploads and ingests a regulatory document (.pdf, .docx, or .txt) into storage and parses metadata. Note: Select a valid local document file in the Postman form-data file selector."
+      }
+    },
+    {
+      "name": "6. Chat Query - RAG Question",
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{access_token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"session_id\": \"{{session_id}}\",\n  \"message\": \"What are the stability testing storage conditions specified in the regulatory guidance?\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/v1/chat",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "chat"
+          ]
+        },
+        "description": "Submits a regulatory guidance query requiring RAG document retrieval and citation synthesis."
+      }
+    },
+    {
+      "name": "7. Chat Query - Tool Use (openFDA Drug Lookup)",
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{access_token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"session_id\": \"{{session_id}}\",\n  \"message\": \"Look up the regulatory label information for Lipitor.\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/v1/chat",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "chat"
+          ]
+        },
+        "description": "Invokes the openFDA drug lookup tool to fetch public drug labeling information and medical disclaimer."
+      }
+    },
+    {
+      "name": "8. Chat Query - Memory Recall (Turn 1: Context)",
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{access_token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"session_id\": \"{{session_id}}\",\n  \"message\": \"We are evaluating stability conditions for Formulation ABC-101.\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/v1/chat",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "chat"
+          ]
+        },
+        "description": "First turn of conversation memory test. Establishes context in Redis conversation memory."
+      }
+    },
+    {
+      "name": "9. Chat Query - Memory Recall (Turn 2: Recall)",
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{access_token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"session_id\": \"{{session_id}}\",\n  \"message\": \"What was the formulation code I just mentioned?\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/v1/chat",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "chat"
+          ]
+        },
+        "description": "Second turn of conversation memory test using the same session_id. Verifies recall from Redis memory."
+      }
+    },
+    {
+      "name": "10. Clear Chat Session Memory",
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{access_token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "DELETE",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/v1/chat/{{session_id}}",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "chat",
+            "{{session_id}}"
+          ]
+        },
+        "description": "Clears active Redis conversation memory for the specified session_id."
+      }
+    }
+  ]
+}
