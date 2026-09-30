@@ -1,0 +1,85 @@
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: rf-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-regulatory_affairs_db}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./docker/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-regulatory_affairs_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: rf-redis
+    restart: unless-stopped
+    volumes:
+      - redisdata:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: rf-backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      POSTGRES_HOST: db
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-regulatory_affairs_db}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-default-insecure-dev-secret-key-change-in-prod}
+      JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
+      JWT_ACCESS_TOKEN_EXPIRE_MINUTES: ${JWT_ACCESS_TOKEN_EXPIRE_MINUTES:-30}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      LLM_MODEL: ${LLM_MODEL:-gpt-4o}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-text-embedding-3-small}
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    container_name: rf-frontend
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    environment:
+      API_BASE_URL: http://backend:8000
+    ports:
+      - "8501:8501"
+
+volumes:
+  pgdata:
+  redisdata:
