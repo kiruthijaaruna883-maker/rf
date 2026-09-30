@@ -96,7 +96,7 @@ graph TD
 
 ## 7. User Request Flow
 
-1. **User Authentication:** The user logs in via Streamlit; Streamlit requests a JWT token from FastAPI (`/api/v1/auth/token`) and stores it in the user session.
+1. **User Authentication:** The user logs in via Streamlit; Streamlit requests a JWT token from FastAPI (`/auth/login`) and stores it in the user session.
 2. **Query Submission:** The user submits a regulatory query via the Streamlit interface.
 3. **API Dispatch:** Streamlit sends a POST request with the query and JWT bearer token to the FastAPI query endpoint.
 4. **Security & Context Loading:** FastAPI validates the token, extracts the user ID, and passes the query to the LangGraph runtime. The runtime retrieves prior session messages from Redis.
@@ -205,16 +205,30 @@ graph TD
 ---
 
 ## 15. Streamlit Responsibilities
-* **User Presentation:** Delivers a modern, clean web interface tailored for regulatory professionals.
-* **Session Management:** Persists JWT tokens, selected models, and conversation IDs in Streamlit session state.
-* **Citation Display:** Renders retrieved source documents, page numbers, and regulatory reference tags alongside agent answers.
-* **Interactive Controls:** Provides filters for regulatory agency sources, document upload triggers, and chat clearing.
+* **Frontend Architecture & Location:** The Phase 6 Streamlit frontend is organized under `frontend/`:
+  * `frontend/app.py`: Main entry point and page controller.
+  * `frontend/api_client.py`: Typed HTTP client communicating with FastAPI endpoints.
+  * `frontend/session.py`: Session state management for authentication, tokens, session IDs, and messages.
+  * `frontend/components/auth_view.py`: User authentication portal (Login & Registration).
+  * `frontend/components/sidebar.py`: User profile info, active session identifier, and conversation controls.
+  * `frontend/components/chat_view.py`: Conversational chat stream, markdown rendering, and evidence expanders.
+  * `frontend/config.py`: Application metadata and configurable backend base URL.
+  * `frontend/requirements.txt`: Frontend dependencies (`streamlit==1.60.0`, `httpx==0.28.1`).
+* **User Presentation:** Delivers a modern, clean web interface tailored for regulatory professionals with dedicated login, registration, and chat views.
+* **Session Management:** Persists JWT access tokens, user metadata, unique conversation session IDs, and active message history in Streamlit session state.
+* **Citation Display:** Renders retrieved source documents, chunk indices, openFDA labeling records, and regulatory citations alongside agent answers in expandable evidence breakdowns.
+* **Interactive Controls:** Provides "New Conversation" (generates fresh session ID), "Clear Current Chat" (triggers backend memory clearing and resets visible chat), and "Sign Out".
+* **Backend Communication & Startup:**
+  * Base URL configured via `API_BASE_URL` (default `http://127.0.0.1:8000`).
+  * Backend startup: `uvicorn app.main:app --reload`
+  * Frontend startup: `streamlit run frontend/app.py`
+* **Session Clearing Endpoint:** Calls `DELETE /api/v1/chat/{session_id}` to clear active Redis conversation memory for the authenticated user session while preserving immutable compliance audit records in `chat_logs`.
 
 ---
 
 ## 16. Authentication Flow
 1. **Credentials Dispatch:** User submits username and password via the Streamlit login interface.
-2. **Verification:** FastAPI receives credentials at `/api/v1/auth/token`, looks up the user record in PostgreSQL, and verifies the password hash using `bcrypt`.
+2. **Verification:** FastAPI receives credentials at `/auth/login`, looks up the user record in PostgreSQL, and verifies the password hash using `bcrypt`.
 3. **Token Issuance:** Upon success, FastAPI issues HS256-signed JWT access tokens with an expiration time (`JWT_ACCESS_TOKEN_EXPIRE_MINUTES`), matching the project configuration (`JWT_ALGORITHM=HS256`).
 4. **Client Storage:** Streamlit stores the JWT in its session state for subsequent API requests.
 5. **Authenticated Requests:** Streamlit attaches the token as an HTTP header: `Authorization: Bearer <token>`.

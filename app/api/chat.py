@@ -19,7 +19,7 @@ from app.agent.graph import (
 from app.api.auth import get_current_user
 from app.database.models import ChatLog, User
 from app.database.session import get_db
-from app.memory.redis_memory import RedisMemoryError
+from app.memory.redis_memory import RedisConversationMemory, RedisMemoryError
 from app.schemas.chat import ChatRequest, ChatResponse
 
 logger = logging.getLogger(__name__)
@@ -125,3 +125,49 @@ def chat_endpoint(
         session_id=clean_session_id,
         response=agent_response,
     )
+
+@router.delete(
+    "/chat/{session_id}",
+    status_code=status.HTTP_200_OK,
+    summary="Clear conversation memory for a session",
+    description=(
+        "Clears active Redis conversation memory for the authenticated user session. "
+        "Does not delete immutable compliance audit records."
+    ),
+)
+def clear_chat_session(
+    session_id: str,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[Session, Depends(get_db)],
+) -> dict[str, str]:
+    """Clear Redis conversation memory for the specified session."""
+    clean_session_id = session_id.strip() if isinstance(session_id, str) else ""
+    if not clean_session_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="session_id cannot be empty or whitespace-only.",
+        )
+
+    # Check session ownership in chat_logs if existing logs exist for this session
+    existing_logs = db.query(ChatLog).filter(ChatLog.session_id == clean_session_id).all()
+    if existing_logs:
+        if any(log.user_id != current_user.id for log in existing_logs):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not authorized to clear this chat session.",
+            )
+
+    try:
+        memory = RedisConversationMemory()
+        memory.clear(clean_session_id)
+    except RedisMemoryError as exc:
+        logger.error("Redis memory failure clearing session %s: %s", clean_session_id, exc)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Conversation memory service is temporarily unavailable.",
+        ) from exc
+
+    return {
+        "session_id": clean_session_id,
+        "message": "Conversation history cleared successfully.",
+    }
