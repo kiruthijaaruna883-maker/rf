@@ -10,10 +10,12 @@ class Settings(BaseSettings):
     )
 
     # LLM Configuration
-    LLM_PROVIDER: str = "openai"
+    LLM_PROVIDER: str = "ollama"
+    OLLAMA_BASE_URL: str = "http://127.0.0.1:11434"
+    OLLAMA_MODEL: str = "qwen2.5:3b"
     OPENAI_API_KEY: Optional[str] = None
     LLM_MODEL: str = "gpt-4o"
-    EMBEDDING_MODEL: str = "text-embedding-3-small"
+    EMBEDDING_MODEL: str = "nomic-embed-text:latest"
 
     # PostgreSQL Configuration
     POSTGRES_HOST: str = "localhost"

@@ -1,4 +1,4 @@
-"""End-to-end integration test for the Phase 4 RAG pipeline.
+﻿"""End-to-end integration test for the Phase 4 RAG pipeline.
 
 Tests the full sequential flow:
 Document text -> Normalization -> Chunking -> Embedding (mocked API) -> pgvector Storage -> Similarity Retrieval
@@ -75,7 +75,7 @@ class TestRAGPipelineE2E(unittest.TestCase):
         # Assign an orthogonal basis vector to each chunk
         chunk_embeddings = []
         for i in range(len(chunks)):
-            vec = [0.0] * 1536
+            vec = [0.0] * 768
             vec[i] = 1.0
             chunk_embeddings.append(vec)
 

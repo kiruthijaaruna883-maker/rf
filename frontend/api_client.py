@@ -279,3 +279,44 @@ class RegulatoryChatClient:
             return response.json()
         except Exception as exc:
             raise APIClientError("Malformed JSON response from clear chat endpoint.") from exc
+
+    def upload_document(
+        self,
+        token: str,
+        filename: str,
+        file_bytes: bytes,
+        content_type: str = "application/octet-stream",
+    ) -> dict[str, Any]:
+        """Upload and ingest a regulatory document (.pdf, .docx, .txt) via POST /documents/upload."""
+        if not token or not isinstance(token, str):
+            raise AuthenticationError("Authentication token is required for document upload.")
+        if not filename or not isinstance(filename, str) or not filename.strip():
+            raise ValidationError("Filename cannot be empty.")
+        if not file_bytes:
+            raise ValidationError("File content cannot be empty.")
+
+        url = f"{self.base_url}/documents/upload"
+        headers = {"Authorization": f"Bearer {token.strip()}"}
+        files = {"file": (filename.strip(), file_bytes, content_type)}
+
+        try:
+            if self._external_client is not None:
+                response = self._external_client.post(url, files=files, headers=headers)
+            else:
+                with httpx.Client(timeout=self.timeout) as client:
+                    response = client.post(url, files=files, headers=headers)
+        except httpx.TimeoutException as exc:
+            raise BackendUnavailableError("Document upload timed out waiting for ingestion to complete.") from exc
+        except (httpx.ConnectError, httpx.RequestError) as exc:
+            raise BackendUnavailableError(
+                f"Unable to connect to backend server at {self.base_url}."
+            ) from exc
+
+        if response.status_code != 201:
+            self._handle_response_error(response, "Document upload and ingestion")
+
+        try:
+            return response.json()
+        except Exception as exc:
+            raise APIClientError("Malformed JSON response from document upload endpoint.") from exc
+

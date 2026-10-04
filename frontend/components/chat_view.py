@@ -42,6 +42,47 @@ def render_chat_view(client: RegulatoryChatClient) -> None:
     st.markdown(f"## {APP_TITLE}")
     st.caption("Submit queries regarding regulatory guidance, stability conditions, drug labeling, or user access.")
 
+    # Upload Regulatory Document section
+    with st.expander("Upload Regulatory Document", expanded=False):
+        uploaded_file = st.file_uploader(
+            "Select regulatory document",
+            type=["pdf", "docx", "txt"],
+            key="upload_regulatory_doc",
+            help="Supported formats: PDF, DOCX, TXT",
+        )
+        if st.button("Upload & Ingest", key="btn_upload_ingest", use_container_width=True):
+            if uploaded_file is None:
+                st.warning("Please select a document file (.pdf, .docx, or .txt) before clicking Upload & Ingest.")
+            else:
+                token = get_access_token()
+                if not token:
+                    st.error("Authentication expired. Please sign in again.")
+                    logout()
+                    st.rerun()
+                else:
+                    with st.spinner(f"Ingesting '{uploaded_file.name}' into RAG vector store..."):
+                        try:
+                            resp = client.upload_document(
+                                token=token,
+                                filename=uploaded_file.name,
+                                file_bytes=uploaded_file.getvalue(),
+                                content_type=uploaded_file.type or "application/octet-stream",
+                            )
+                            chunks_count = resp.get("chunks_count")
+                            backend_msg = resp.get("message", "Document successfully ingested into RAG vector store.")
+                            chunks_detail = f" ({chunks_count} chunks ingested)" if chunks_count is not None else ""
+                            st.success(f"**{uploaded_file.name}**: {backend_msg}{chunks_detail}")
+                        except AuthenticationError:
+                            st.error("Your session has expired. Please sign in again.")
+                            logout()
+                            st.rerun()
+                        except BackendUnavailableError as exc:
+                            st.error(f"Backend unavailable: {exc.message}")
+                        except APIClientError as exc:
+                            st.error(f"Ingestion failed: {exc.message}")
+                        except Exception as exc:
+                            st.error(f"Failed to ingest document: {exc}")
+
     # Render conversation history
     messages = get_messages()
     for msg in messages:
@@ -110,4 +151,3 @@ def render_chat_view(client: RegulatoryChatClient) -> None:
                         st.error(f"Query processing error: {exc.message}")
                     except Exception as exc:
                         st.error("An unexpected error occurred while communicating with the assistant.")
-            st.rerun()

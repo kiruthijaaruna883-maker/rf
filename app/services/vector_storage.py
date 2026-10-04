@@ -1,4 +1,4 @@
-"""Vector storage service for Regulatory Affairs Assistant.
+﻿"""Vector storage service for Regulatory Affairs Assistant.
 
 Persists document chunks and their dense vector embeddings into PostgreSQL
 using SQLAlchemy and pgvector.
@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from app.database.models import Document, DocumentChunk
 from app.services.chunking import Chunk
 
-EXPECTED_EMBEDDING_DIMENSION: int = 1536
+EXPECTED_EMBEDDING_DIMENSION: int = 768
 
 
 def store_document_chunks(
@@ -27,14 +27,14 @@ def store_document_chunks(
         db: Active SQLAlchemy database session.
         document_id: Existing parent Document ID.
         chunks: Sequence of Chunk instances to persist.
-        embeddings: Sequence of 1536-dimensional float vectors corresponding to chunks.
+        embeddings: Sequence of 768-dimensional float vectors corresponding to chunks.
 
     Returns:
         List of persisted DocumentChunk instances in the same order as supplied chunks.
 
     Raises:
         ValueError: If inputs fail validation (nonexistent document_id, empty sequences,
-            mismatched lengths, invalid chunk indexes, non-1536 dimensions, or non-numeric values).
+            mismatched lengths, invalid chunk indexes, non-768 dimensions, or non-numeric values).
         RuntimeError: If database persistence fails.
     """
     # 1. Validate document_id

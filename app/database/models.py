@@ -1,4 +1,4 @@
-"""SQLAlchemy 2.x database models for Regulatory Affairs Assistant."""
+﻿"""SQLAlchemy 2.x database models for Regulatory Affairs Assistant."""
 
 from datetime import datetime
 from typing import Any, Dict, List, Optional
@@ -106,7 +106,7 @@ class DocumentChunk(Base):
     start_char: Mapped[int] = mapped_column(Integer, nullable=False)
     end_char: Mapped[int] = mapped_column(Integer, nullable=False)
     metadata_json: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSON, nullable=True)
-    embedding: Mapped[List[float]] = mapped_column(Vector(1536), nullable=False)
+    embedding: Mapped[List[float]] = mapped_column(Vector(768), nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),

@@ -1,4 +1,4 @@
-"""Similarity retrieval service for Regulatory Affairs Assistant.
+﻿"""Similarity retrieval service for Regulatory Affairs Assistant.
 
 Provides cosine-distance vector similarity search against document chunks
 stored in PostgreSQL using pgvector, returning structured retrieval results.
@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 from app.database.models import Document, DocumentChunk
 from app.services.embeddings import embed_text
 
-EXPECTED_EMBEDDING_DIMENSION: int = 1536
+EXPECTED_EMBEDDING_DIMENSION: int = 768
 
 
 @dataclass
@@ -45,7 +45,7 @@ def search_similar_chunks(
 
     Args:
         db: Active SQLAlchemy database session.
-        query_vector: Sequence of 1536 numeric float values representing the query embedding.
+        query_vector: Sequence of 768 numeric float values representing the query embedding.
         top_k: Maximum number of matching chunks to return (default 5).
         document_id: Optional single document ID filter.
         document_ids: Optional sequence of document IDs filter.

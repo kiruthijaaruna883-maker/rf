@@ -28,6 +28,15 @@ class TestFrontendBackendIntegration(unittest.TestCase):
     def tearDown(self) -> None:
         app.dependency_overrides = {}
 
+    def test_client_against_fastapi_upload_document_unauthorized(self) -> None:
+        app.dependency_overrides = {get_db: lambda: self.mock_db}
+        with self.assertRaises(Exception):
+            self.api_client.upload_document(
+                token="invalid-token",
+                filename="doc.txt",
+                file_bytes=b"Content",
+            )
+
     def test_client_against_fastapi_unauthorized_rejection(self) -> None:
         app.dependency_overrides = {get_db: lambda: self.mock_db}
         with self.assertRaises(Exception):

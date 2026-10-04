@@ -1,4 +1,4 @@
-"""Integration tests for PostgreSQL and pgvector document chunk storage."""
+﻿"""Integration tests for PostgreSQL and pgvector document chunk storage."""
 
 import unittest
 from sqlalchemy import func, select
@@ -43,8 +43,8 @@ class TestVectorStorage(unittest.TestCase):
             Chunk(chunk_index=0, content="Regulatory Intro", char_count=16, start_char=0, end_char=16),
             Chunk(chunk_index=1, content="Regulatory Scope", char_count=16, start_char=17, end_char=33),
         ]
-        v0 = [0.01] * 1536
-        v1 = [0.02] * 1536
+        v0 = [0.01] * 768
+        v1 = [0.02] * 768
         embeddings = [v0, v1]
 
         stored = store_document_chunks(self.db, doc.id, chunks, embeddings)
@@ -59,7 +59,7 @@ class TestVectorStorage(unittest.TestCase):
         ).all()
         self.assertEqual(len(direct_chunks), 2)
         # Vector dimension check
-        self.assertEqual(len(direct_chunks[0].embedding), 1536)
+        self.assertEqual(len(direct_chunks[0].embedding), 768)
         self.assertAlmostEqual(direct_chunks[0].embedding[0], 0.01, places=5)
         self.assertAlmostEqual(direct_chunks[1].embedding[0], 0.02, places=5)
 
@@ -68,7 +68,7 @@ class TestVectorStorage(unittest.TestCase):
         chunks = [
             Chunk(chunk_index=0, content="Content A", char_count=9, start_char=0, end_char=9),
         ]
-        embeddings = [[0.05] * 1536]
+        embeddings = [[0.05] * 768]
         store_document_chunks(self.db, doc.id, chunks, embeddings)
 
         self.db.refresh(doc)
@@ -81,7 +81,7 @@ class TestVectorStorage(unittest.TestCase):
             Chunk(chunk_index=0, content="Content 1", char_count=9, start_char=0, end_char=9),
             Chunk(chunk_index=1, content="Content 2", char_count=9, start_char=10, end_char=19),
         ]
-        embeddings = [[0.1] * 1536, [0.2] * 1536]
+        embeddings = [[0.1] * 768, [0.2] * 768]
         store_document_chunks(self.db, doc.id, chunks, embeddings)
 
         # Verify chunks exist
@@ -107,19 +107,19 @@ class TestVectorStorage(unittest.TestCase):
             Chunk(chunk_index=0, content="First", char_count=5, start_char=0, end_char=5),
             Chunk(chunk_index=0, content="Duplicate", char_count=9, start_char=6, end_char=15),
         ]
-        embeddings = [[0.1] * 1536, [0.2] * 1536]
+        embeddings = [[0.1] * 768, [0.2] * 768]
         with self.assertRaises(ValueError):
             store_document_chunks(self.db, doc.id, chunks, embeddings)
 
     def test_duplicate_chunk_index_in_database_rolled_back(self):
         doc = self._create_test_document("test_dup_db.pdf")
         chunks1 = [Chunk(chunk_index=0, content="Initial", char_count=7, start_char=0, end_char=7)]
-        embeddings1 = [[0.1] * 1536]
+        embeddings1 = [[0.1] * 768]
         store_document_chunks(self.db, doc.id, chunks1, embeddings1)
 
         # Try to store another chunk with chunk_index=0 for same document
         chunks2 = [Chunk(chunk_index=0, content="Conflict", char_count=8, start_char=0, end_char=8)]
-        embeddings2 = [[0.2] * 1536]
+        embeddings2 = [[0.2] * 768]
         with self.assertRaises(RuntimeError):
             store_document_chunks(self.db, doc.id, chunks2, embeddings2)
 
@@ -133,7 +133,7 @@ class TestVectorStorage(unittest.TestCase):
     def test_validation_errors(self):
         doc = self._create_test_document("test_validation.pdf")
         valid_chunk = Chunk(chunk_index=0, content="Content", char_count=7, start_char=0, end_char=7)
-        valid_emb = [0.1] * 1536
+        valid_emb = [0.1] * 768
 
         # Non-existent document_id
         with self.assertRaises(ValueError):
@@ -153,7 +153,7 @@ class TestVectorStorage(unittest.TestCase):
             store_document_chunks(self.db, doc.id, [valid_chunk], [bad_dim_emb])
 
         # Non-numeric embedding value
-        non_num_emb = [0.1] * 1535 + ["text"]
+        non_num_emb = [0.1] * 767 + ["text"]
         with self.assertRaises(ValueError):
             store_document_chunks(self.db, doc.id, [valid_chunk], [non_num_emb])
 

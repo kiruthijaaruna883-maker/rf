@@ -93,6 +93,8 @@ class TestAgentRouting(unittest.TestCase):
             ("What does openFDA list for Advil?", "Advil"),
             ("Look up aspirin in openfda", "aspirin"),
             ("Drug lookup for Ibuprofen", "Ibuprofen"),
+            ("What are the warnings for aspirin according to FDA labeling?", "aspirin"),
+            ("What are the adverse reactions for aspirin according to FDA labeling?", "aspirin"),
         ]
         for query, expected_drug in cases:
             with self.subTest(query=query):

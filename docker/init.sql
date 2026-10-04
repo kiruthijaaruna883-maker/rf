@@ -1,4 +1,4 @@
--- ==============================================================================
+﻿-- ==============================================================================
 -- Regulatory Affairs Assistant - Database Initialization Script
 -- Executed on initial creation of PostgreSQL pgvector container volume
 -- ==============================================================================
@@ -39,7 +39,7 @@ CREATE TABLE IF NOT EXISTS document_chunks (
     start_char INTEGER NOT NULL,
     end_char INTEGER NOT NULL,
     metadata_json JSONB,
-    embedding vector(1536) NOT NULL,
+    embedding vector(768) NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 

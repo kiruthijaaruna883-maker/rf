@@ -1,4 +1,4 @@
-﻿"""LangGraph agent orchestration for Regulatory Affairs Assistant."""
+"""LangGraph agent orchestration for Regulatory Affairs Assistant."""
 
 from __future__ import annotations
 
@@ -18,7 +18,7 @@ from app.memory.redis_memory import ConversationMessage, RedisConversationMemory
 logger = logging.getLogger(__name__)
 
 OPENAI_CHAT_COMPLETIONS_URL: str = "https://api.openai.com/v1/chat/completions"
-DEFAULT_LLM_TIMEOUT: float = 60.0
+DEFAULT_LLM_TIMEOUT: float = 180.0
 
 
 class AgentError(Exception):
@@ -70,8 +70,56 @@ def call_llm(
     client: Optional[httpx.Client] = None,
     timeout: float = DEFAULT_LLM_TIMEOUT,
 ) -> str:
-    """Send chat completion request to OpenAI-compatible endpoint."""
+    """Send chat completion request to configured LLM endpoint (Ollama or OpenAI)."""
     settings = get_settings()
+    provider = getattr(settings, "LLM_PROVIDER", "ollama").lower()
+    if provider.startswith("your-") or "placeholder" in provider:
+        provider = "ollama"
+
+    # Ollama provider route
+    if provider == "ollama" and api_key is None:
+        base_url = getattr(settings, "OLLAMA_BASE_URL", "http://127.0.0.1:11434").rstrip("/")
+        ollama_url = f"{base_url}/api/chat"
+        resolved_model = model or getattr(settings, "OLLAMA_MODEL", "qwen2.5:3b")
+        if resolved_model.startswith("your-") or "placeholder" in resolved_model.lower():
+            resolved_model = "qwen2.5:3b"
+
+        payload = {
+            "model": resolved_model,
+            "messages": messages,
+            "stream": False,
+            "options": {"temperature": 0.0},
+        }
+
+        try:
+            if client is not None:
+                response = client.post(ollama_url, json=payload, timeout=timeout)
+            else:
+                with httpx.Client(timeout=timeout) as internal_client:
+                    response = internal_client.post(ollama_url, json=payload)
+        except httpx.TimeoutException as exc:
+            raise LLMError("LLM API request timed out.") from exc
+        except httpx.ConnectError as exc:
+            raise LLMError("Failed to connect to LLM provider.") from exc
+        except httpx.RequestError as exc:
+            raise LLMError(f"Network error during LLM request: {exc.__class__.__name__}.") from exc
+
+        if response.status_code != 200:
+            raise LLMAPIError(f"Ollama API error ({response.status_code}): {response.text}", status_code=response.status_code)
+
+        try:
+            data = response.json()
+            message_obj = data.get("message", {})
+            content = message_obj.get("content")
+            if content is None:
+                raise LLMError("Malformed LLM response: missing message 'content'.")
+            return str(content).strip()
+        except Exception as exc:
+            if isinstance(exc, LLMError):
+                raise
+            raise LLMError(f"Failed to parse LLM response JSON: {exc}") from exc
+
+    # OpenAI provider route (applicable when provider == 'openai' or explicit api_key passed)
     key = _validate_llm_api_key(api_key or settings.OPENAI_API_KEY)
     resolved_model = model or settings.LLM_MODEL or "gpt-4o"
     if resolved_model.startswith("your-") or "placeholder" in resolved_model.lower():
@@ -150,6 +198,13 @@ def extract_drug_name(query: str) -> str:
         idx = lower_q.find(prefix)
         if idx != -1:
             candidate = query[idx + len(prefix):].strip(" ?.!,;:'\"")
+            # Strip trailing FDA / openFDA labeling clauses
+            candidate = re.sub(
+                r"\s+(?:according\s+to|in|on|per|from)\s+(?:the\s+)?(?:official\s+)?(?:open)?fda(?:[-\s]+approved)?(?:\s+drug)?\s+label(?:ing)?.*$",
+                "",
+                candidate,
+                flags=re.IGNORECASE,
+            ).strip(" ?.!,;:'\"")
             for suffix in [" in openfda", " on openfda", " from openfda"]:
                 if candidate.lower().endswith(suffix):
                     candidate = candidate[:-len(suffix)].strip()
@@ -204,6 +259,9 @@ def route_intent(query: str, user_id: Optional[str] = None) -> tuple[Optional[st
         "medication",
         "active ingredient",
         "drug",
+        "fda label",
+        "fda labeling",
+        "fda-approved label",
     ]
     drug_patterns = [
         r"openfda\s+list\s+for\s+([a-zA-Z0-9\-_ ]+)",
@@ -353,7 +411,10 @@ def create_agent_graph(
                 response_text = str(tool_output)
         elif tool_name == "rag_search":
             evidence = str(tool_output) if tool_output is not None else ""
-            if "No relevant regulatory guidance sections were found" in evidence:
+            if (
+                "No relevant internal regulatory documents found" in evidence
+                or "No relevant regulatory guidance sections were found" in evidence
+            ):
                 response_text = (
                     f"{evidence}\n\n"
                     "Notice: No grounded internal guidance matched your query. "

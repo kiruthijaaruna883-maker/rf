@@ -1,6 +1,12 @@
 """Configuration settings for the Streamlit frontend."""
 
 import os
+from pathlib import Path
+from dotenv import load_dotenv
+
+# Ensure .env configuration is loaded before reading environment variables
+_env_path = Path(__file__).resolve().parent.parent / ".env"
+load_dotenv(_env_path if _env_path.exists() else None)
 
 # Base URL for FastAPI backend (configurable via environment variable)
 API_BASE_URL: str = os.getenv("API_BASE_URL", "http://127.0.0.1:8000").rstrip("/")

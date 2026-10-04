@@ -275,6 +275,81 @@ class TestRegulatoryChatClient(unittest.TestCase):
         with self.assertRaises(AuthenticationError):
             self.client.clear_chat(token="", session_id="sess-1")
 
+    # --- Upload Document Tests ---
+
+    def test_upload_document_success(self) -> None:
+        mock_resp = MagicMock(spec=httpx.Response)
+        mock_resp.status_code = 201
+        mock_resp.json.return_value = {
+            "id": 1,
+            "filename": "guideline.txt",
+            "chunks_count": 3,
+            "message": "Document successfully ingested into RAG vector store.",
+        }
+        self.mock_http.post.return_value = mock_resp
+
+        result = self.client.upload_document(
+            token="valid-token",
+            filename="guideline.txt",
+            file_bytes=b"Sample content",
+            content_type="text/plain",
+        )
+
+        self.mock_http.post.assert_called_once()
+        call_args, call_kwargs = self.mock_http.post.call_args
+        self.assertEqual(call_args[0], "http://testserver:8000/documents/upload")
+        self.assertEqual(call_kwargs["headers"], {"Authorization": "Bearer valid-token"})
+        self.assertIn("file", call_kwargs["files"])
+        self.assertEqual(result["chunks_count"], 3)
+        self.assertIn("successfully ingested", result["message"])
+
+    def test_upload_document_empty_token_raises_auth_error(self) -> None:
+        with self.assertRaises(AuthenticationError):
+            self.client.upload_document(
+                token="",
+                filename="doc.txt",
+                file_bytes=b"content",
+            )
+
+    def test_upload_document_empty_filename_raises_validation_error(self) -> None:
+        with self.assertRaises(ValidationError):
+            self.client.upload_document(
+                token="token",
+                filename="   ",
+                file_bytes=b"content",
+            )
+
+    def test_upload_document_empty_bytes_raises_validation_error(self) -> None:
+        with self.assertRaises(ValidationError):
+            self.client.upload_document(
+                token="token",
+                filename="doc.txt",
+                file_bytes=b"",
+            )
+
+    def test_upload_document_timeout_raises_backend_unavailable(self) -> None:
+        self.mock_http.post.side_effect = httpx.TimeoutException("Read timed out")
+        with self.assertRaises(BackendUnavailableError):
+            self.client.upload_document(
+                token="token",
+                filename="doc.txt",
+                file_bytes=b"content",
+            )
+
+    def test_upload_document_error_status_translates(self) -> None:
+        mock_resp = MagicMock(spec=httpx.Response)
+        mock_resp.status_code = 422
+        mock_resp.json.return_value = {"detail": "Failed to extract text from document"}
+        self.mock_http.post.return_value = mock_resp
+
+        with self.assertRaises(APIClientError) as ctx:
+            self.client.upload_document(
+                token="token",
+                filename="doc.pdf",
+                file_bytes=b"corrupt",
+            )
+        self.assertIn("Failed to extract text", str(ctx.exception))
+
     def test_no_credentials_leaked_in_exception_messages(self) -> None:
         secret_pass = "UltraSecretPassword999!"
         mock_resp = MagicMock(spec=httpx.Response)

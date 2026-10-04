@@ -1,4 +1,4 @@
-"""Integration tests for similarity retrieval against PostgreSQL and pgvector."""
+﻿"""Integration tests for similarity retrieval against PostgreSQL and pgvector."""
 
 import math
 from unittest.mock import MagicMock, patch
@@ -28,7 +28,7 @@ class TestRetrieval(unittest.TestCase):
             self.db.close()
 
     def _setup_test_documents_and_chunks(self):
-        """Create 2 documents with distinct known 1536-dimensional vectors."""
+        """Create 2 documents with distinct known 768-dimensional vectors."""
         doc1 = Document(
             filename="fda_guidance_2026.pdf",
             file_path="/tmp/fda_guidance_2026.pdf",
@@ -46,20 +46,20 @@ class TestRetrieval(unittest.TestCase):
         self.test_docs.extend([doc1, doc2])
 
         # Direction 0: aligned along axis 0
-        v0 = [0.0] * 1536
+        v0 = [0.0] * 768
         v0[0] = 1.0
 
         # Direction 1: 45 degrees between axis 0 and 1 (distance ~ 1 - 1/sqrt(2) = 0.2929)
-        v1 = [0.0] * 1536
+        v1 = [0.0] * 768
         v1[0] = 1.0 / math.sqrt(2)
         v1[1] = 1.0 / math.sqrt(2)
 
         # Direction 2: aligned along axis 1 (orthogonal to axis 0, distance = 1.0)
-        v2 = [0.0] * 1536
+        v2 = [0.0] * 768
         v2[1] = 1.0
 
         # Direction 3: doc2 chunk, distance ~ 0.5 to axis 0
-        v3 = [0.0] * 1536
+        v3 = [0.0] * 768
         v3[0] = 0.5
         v3[1] = math.sqrt(0.75)
 
@@ -112,7 +112,7 @@ class TestRetrieval(unittest.TestCase):
         doc1, doc2, chunks = self._setup_test_documents_and_chunks()
 
         # Query vector perfectly matches v0 (axis 0)
-        query_vector = [0.0] * 1536
+        query_vector = [0.0] * 768
         query_vector[0] = 1.0
 
         results = search_similar_chunks(self.db, query_vector, top_k=5)
@@ -135,7 +135,7 @@ class TestRetrieval(unittest.TestCase):
 
     def test_top_k_limiting_and_fewer_than_k(self):
         doc1, doc2, chunks = self._setup_test_documents_and_chunks()
-        query_vector = [0.0] * 1536
+        query_vector = [0.0] * 768
         query_vector[0] = 1.0
 
         # top_k=2 limits to 2
@@ -148,14 +148,14 @@ class TestRetrieval(unittest.TestCase):
 
     def test_empty_database_returns_empty_list(self):
         # Database has no chunks matching
-        query_vector = [0.0] * 1536
+        query_vector = [0.0] * 768
         query_vector[0] = 1.0
         results = search_similar_chunks(self.db, query_vector, top_k=5)
         self.assertEqual(results, [])
 
     def test_document_id_and_document_ids_filtering(self):
         doc1, doc2, chunks = self._setup_test_documents_and_chunks()
-        query_vector = [0.0] * 1536
+        query_vector = [0.0] * 768
         query_vector[0] = 1.0
 
         # Single document_id filter
@@ -175,7 +175,7 @@ class TestRetrieval(unittest.TestCase):
 
     def test_max_distance_filtering(self):
         doc1, doc2, chunks = self._setup_test_documents_and_chunks()
-        query_vector = [0.0] * 1536
+        query_vector = [0.0] * 768
         query_vector[0] = 1.0
 
         # Cutoff distance at 0.3 should include only chunks 0 (dist 0) and 1 (dist ~0.2929)
@@ -186,7 +186,7 @@ class TestRetrieval(unittest.TestCase):
 
     def test_retrieval_is_strictly_read_only(self):
         doc1, doc2, chunks = self._setup_test_documents_and_chunks()
-        query_vector = [0.0] * 1536
+        query_vector = [0.0] * 768
         query_vector[0] = 1.0
 
         count_before = self.db.scalar(select(func.count(DocumentChunk.id)))
@@ -200,7 +200,7 @@ class TestRetrieval(unittest.TestCase):
 
     def test_retrieve_chunks_delegates_to_embed_text(self):
         doc1, doc2, chunks = self._setup_test_documents_and_chunks()
-        query_vector = [0.0] * 1536
+        query_vector = [0.0] * 768
         query_vector[0] = 1.0
 
         with patch("app.services.retrieval.embed_text") as mock_embed:
@@ -219,7 +219,7 @@ class TestRetrieval(unittest.TestCase):
             self.assertEqual(results[0].chunk_id, chunks[0].id)
 
     def test_validation_errors(self):
-        valid_vec = [0.0] * 1536
+        valid_vec = [0.0] * 768
 
         # Bad query string
         with self.assertRaises(ValueError):
@@ -233,9 +233,9 @@ class TestRetrieval(unittest.TestCase):
 
         # Non-numeric or boolean in vector
         with self.assertRaises(ValueError):
-            search_similar_chunks(self.db, [0.1] * 1535 + ["bad"])
+            search_similar_chunks(self.db, [0.1] * 767 + ["bad"])
         with self.assertRaises(ValueError):
-            search_similar_chunks(self.db, [0.1] * 1535 + [True])
+            search_similar_chunks(self.db, [0.1] * 767 + [True])
 
         # Bad top_k
         with self.assertRaises(ValueError):
